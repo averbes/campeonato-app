@@ -1,0 +1,28 @@
+.resultados-container {
+  padding: 20px;
+}
+
+.resultados-lista .card {
+  transition: transform 0.2s;
+}
+
+.resultados-lista .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.equipo-local, .equipo-visitante {
+  flex: 1;
+}
+
+.versus {
+  font-weight: bold;
+  color: #666;
+}
+
+.resultado {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #333;
+  padding: 0 10px;
+}

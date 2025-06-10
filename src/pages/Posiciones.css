@@ -1,0 +1,46 @@
+.posiciones-container {
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.table th {
+  background-color: #0d6efd;
+  color: white;
+  font-weight: 500;
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+/* Estilos para las posiciones de clasificación */
+tr:nth-child(-n+4) td:first-child {
+  background-color: #28a745;
+  color: white;
+  font-weight: bold;
+}
+
+/* Estilos para las posiciones de descenso */
+tr:nth-last-child(-n+2) td:first-child {
+  background-color: #dc3545;
+  color: white;
+  font-weight: bold;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .table {
+    font-size: 0.9rem;
+  }
+  
+  .table th, .table td {
+    padding: 0.5rem;
+  }
+}
+
+/* Tooltip para explicar abreviaturas */
+.table th[title] {
+  cursor: help;
+}

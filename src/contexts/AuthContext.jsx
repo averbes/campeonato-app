@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth } from '../firebase/config';
+import { auth, db } from '../firebase/config';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { authService } from '../services/api';
 
 const AuthContext = createContext();
@@ -11,16 +12,24 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(
-      (user) => {
-        // Sanitizar datos del usuario antes de guardarlos
+      async (user) => {
         if (user) {
-          const sanitizedUser = {
-            uid: user.uid,
-            email: user.email,
-            emailVerified: user.emailVerified,
-            // No incluir información sensible
-          };
-          setUser(sanitizedUser);
+          try {
+            // Obtener datos adicionales del usuario desde Firestore
+            const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+            const userData = userDoc.data();
+
+            const sanitizedUser = {
+              uid: user.uid,
+              email: user.email,
+              emailVerified: user.emailVerified,
+              ...userData
+            };
+            setUser(sanitizedUser);
+          } catch (error) {
+            console.error('Error al obtener datos del usuario:', error);
+            setError('Error al cargar datos del usuario');
+          }
         } else {
           setUser(null);
         }
@@ -28,7 +37,7 @@ export function AuthProvider({ children }) {
       },
       (error) => {
         console.error('Error en auth state:', error);
-        setError(error);
+        setError(error.message);
         setLoading(false);
       }
     );
@@ -36,8 +45,10 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
-  const register = async (email, password) => {
+  const register = async (email, password, userData) => {
     try {
+      setError(null); // Limpiar errores anteriores
+      
       // Validar entrada
       if (!email || !password) {
         throw new Error('Email y contraseña son requeridos');
@@ -46,7 +57,21 @@ export function AuthProvider({ children }) {
         throw new Error('La contraseña debe tener al menos 8 caracteres');
       }
       
-      const result = await authService.register(email, password);
+      // Registrar usuario en Firebase Auth
+      const result = await authService.register(email, password, userData);
+      
+      // Guardar datos adicionales en Firestore
+      if (result.user) {
+        await setDoc(doc(db, 'usuarios', result.user.uid), {
+          email: result.user.email,
+          nombre: userData.nombre,
+          tipoUsuario: userData.tipoUsuario,
+          emailVerified: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
+
       return result;
     } catch (error) {
       setError(error.message);
@@ -56,22 +81,20 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
+      setError(null); // Limpiar errores anteriores
       // Validar entrada
       if (!email || !password) {
         throw new Error('Email y contraseña son requeridos');
       }
-      
       // Limitar intentos de login
       const maxAttempts = 5;
       const attemptKey = `login_attempts_${email}`;
       const attempts = parseInt(localStorage.getItem(attemptKey) || '0');
-      
       if (attempts >= maxAttempts) {
         throw new Error('Demasiados intentos. Intente más tarde.');
       }
-
       const result = await authService.login(email, password);
-      
+      console.log('Login desde contexto:', result);
       // Resetear intentos después de login exitoso
       localStorage.setItem(attemptKey, '0');
       return result;
@@ -80,7 +103,6 @@ export function AuthProvider({ children }) {
       const attemptKey = `login_attempts_${email}`;
       const attempts = parseInt(localStorage.getItem(attemptKey) || '0');
       localStorage.setItem(attemptKey, (attempts + 1).toString());
-      
       setError(error.message);
       throw error;
     }
@@ -88,6 +110,7 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
+      setError(null); // Limpiar errores anteriores
       await authService.logout();
       setUser(null);
     } catch (error) {
@@ -96,18 +119,13 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const clearError = () => {
-    setError(null);
-  };
-
   const value = {
     user,
     loading,
     error,
     register,
     login,
-    logout,
-    clearError
+    logout
   };
 
   return (
@@ -124,19 +142,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-import { useAuth } from '../contexts/AuthContext';
-
-function LoginComponent() {
-  const { login } = useAuth();
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    try {
-      await login(email, password);
-      // Redirigir o mostrar mensaje de éxito
-    } catch (error) {
-      // Manejar error
-    }
-  };
-}

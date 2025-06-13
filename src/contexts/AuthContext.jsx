@@ -11,38 +11,61 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    console.log('Configurando listener de autenticación...');
     const unsubscribe = auth.onAuthStateChanged(
-      async (user) => {
-        if (user) {
+      async (firebaseUser) => {
+        console.log('Cambio en estado de autenticación:', firebaseUser ? 'Usuario presente' : 'Sin usuario');
+        
+        if (firebaseUser) {
           try {
             // Obtener datos adicionales del usuario desde Firestore
-            const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+            const userDoc = await getDoc(doc(db, 'usuarios', firebaseUser.uid));
+            console.log('Documento de usuario en Firestore:', userDoc.exists() ? 'Existe' : 'No existe');
+            
+            if (!userDoc.exists()) {
+              console.error('Usuario no encontrado en Firestore');
+              setUser(null);
+              setError('Usuario no encontrado en la base de datos');
+              return;
+            }
+
             const userData = userDoc.data();
+            console.log('Datos del usuario en Firestore:', userData);
 
             const sanitizedUser = {
-              uid: user.uid,
-              email: user.email,
-              emailVerified: user.emailVerified,
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              emailVerified: firebaseUser.emailVerified,
               ...userData
             };
+            
+            console.log('Usuario completo:', sanitizedUser);
             setUser(sanitizedUser);
+            setError(null);
           } catch (error) {
             console.error('Error al obtener datos del usuario:', error);
             setError('Error al cargar datos del usuario');
+            setUser(null);
           }
         } else {
+          console.log('Limpiando estado de usuario');
           setUser(null);
+          setError(null);
         }
         setLoading(false);
       },
       (error) => {
         console.error('Error en auth state:', error);
         setError(error.message);
+        setUser(null);
         setLoading(false);
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      console.log('Limpiando listener de autenticación');
+      unsubscribe();
+    };
   }, []);
 
   const register = async (email, password, userData) => {
@@ -81,28 +104,35 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      setError(null); // Limpiar errores anteriores
-      // Validar entrada
+      setError(null);
+      console.log('AuthContext: Iniciando login...');
+      
       if (!email || !password) {
         throw new Error('Email y contraseña son requeridos');
       }
-      // Limitar intentos de login
-      const maxAttempts = 5;
-      const attemptKey = `login_attempts_${email}`;
-      const attempts = parseInt(localStorage.getItem(attemptKey) || '0');
-      if (attempts >= maxAttempts) {
-        throw new Error('Demasiados intentos. Intente más tarde.');
-      }
+
+      // Intentar login con Firebase
       const result = await authService.login(email, password);
-      console.log('Login desde contexto:', result);
-      // Resetear intentos después de login exitoso
-      localStorage.setItem(attemptKey, '0');
+      
+      if (!result || !result.uid) {
+        // Si el login falla, asegurarse de que el usuario esté deslogueado
+        await auth.signOut();
+        throw new Error('Error en la autenticación');
+      }
+
+      // Verificar que el usuario existe en Firestore
+      const userDoc = await getDoc(doc(db, 'usuarios', result.uid));
+      if (!userDoc.exists()) {
+        await auth.signOut();
+        throw new Error('Usuario no encontrado en la base de datos');
+      }
+
       return result;
+      
     } catch (error) {
-      // Incrementar contador de intentos fallidos
-      const attemptKey = `login_attempts_${email}`;
-      const attempts = parseInt(localStorage.getItem(attemptKey) || '0');
-      localStorage.setItem(attemptKey, (attempts + 1).toString());
+      console.error('AuthContext: Error en login:', error);
+      // Asegurarse de que el usuario esté deslogueado en caso de error
+      await auth.signOut();
       setError(error.message);
       throw error;
     }
@@ -110,7 +140,7 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
-      setError(null); // Limpiar errores anteriores
+      setError(null);
       await authService.logout();
       setUser(null);
     } catch (error) {

@@ -100,7 +100,7 @@ const Register = () => {
       });
       
       // Mostrar mensaje de éxito y redirigir
-      alert('Registro exitoso. Por favor, verifica tu correo electrónico.');
+      alert('Registro exitoso.');
       navigate('/login');
     } catch (error) {
       console.error('Error en registro:', error);

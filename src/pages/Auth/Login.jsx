@@ -55,26 +55,20 @@ function Login() {
 
     try {
       setLoading(true);
-      const user = await login(formData.email, formData.password);
-      console.log('Usuario retornado:', user, JSON.stringify(user));
+      console.log('Iniciando proceso de login con:', formData.email);
       
-      // Verificar si el usuario existe y tiene los datos necesarios
-      if (!user || !user.uid) {
-        throw new Error('Error de autenticación');
-      }
-
-      // Redirigir según el tipo de usuario
-      // if (user.tipoUsuario === 'ADMIN') {
-      //   navigate('/admin/dashboard');
-      // } else {
-      //   navigate('/dashboard');
-      // }
-      navigate('/dashboard');
+      // Intentar login
+      await login(formData.email, formData.password);
+      
+      // Si llegamos aquí, el login fue exitoso
+      console.log('Login exitoso, redirigiendo...');
+      navigate('/posiciones');
+      
     } catch (error) {
-      console.error('Error en login (servicio):', error);
+      console.error('Error detallado en login:', error);
       setErrors(prev => ({
         ...prev,
-        form: error.message
+        form: error.message || 'Error al iniciar sesión'
       }));
     } finally {
       setLoading(false);

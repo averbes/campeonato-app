@@ -21,6 +21,7 @@ const App = () => {
               <Route path="/recuperar-contrasena" element={<ForgotPassword />} />
               <Route path="/equipos" element={<Equipos />} />
               <Route path="/posiciones" element={<Posiciones />} />
+              
               {/* ...otras rutas */}
             </Routes>
           </div>

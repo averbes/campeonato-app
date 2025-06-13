@@ -118,36 +118,34 @@ export const authService = {
   // Login de usuario
   login: async (email, password) => {
     try {
-      console.log('Intentando login con:', email, password);
-      // Validaciones
+      console.log('Iniciando proceso de login con Firebase...');
+      
+      // Validaciones básicas
       if (!email || !password) {
         throw new Error('Email y contraseña son requeridos');
       }
 
-      if (!isValidEmail(email)) {
-        throw new Error('El correo electrónico no es válido');
+      // Intentar autenticar con Firebase
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      if (!userCredential || !userCredential.user) {
+        throw new Error('Error de autenticación');
       }
 
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      console.log('Usuario autenticado:', user);
+      console.log('Usuario autenticado en Firebase:', user.uid);
 
-      // Verificar si el email está verificado
-      // if (!user.emailVerified) {
-      //   await sendEmailVerification(user);
-      //   throw new Error('Por favor, verifica tu correo electrónico antes de iniciar sesión');
-      // }
-
+      // Obtener datos adicionales de Firestore
       const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
-      console.log('Documento Firestore:', userDoc);
-
+      
       if (!userDoc.exists()) {
-        console.log('No existe el usuario en Firestore');
+        // Si el usuario no existe en Firestore, cerrar sesión
+        await signOut(auth);
         throw new Error('Usuario no encontrado en la base de datos');
       }
 
       const userData = userDoc.data();
-      console.log('Datos Firestore:', userData);
+      console.log('Datos del usuario en Firestore:', userData);
 
       return {
         uid: user.uid,
@@ -155,9 +153,22 @@ export const authService = {
         emailVerified: user.emailVerified,
         ...userData
       };
+
     } catch (error) {
-      console.error('Error en login (servicio):', error);
-      throw new Error(errorMessages[error.code] || error.message || 'Error al iniciar sesión');
+      console.error('Error en login:', error);
+      
+      // Manejar errores específicos de Firebase
+      if (error.code === 'auth/user-not-found') {
+        throw new Error('No existe una cuenta con este correo electrónico');
+      } else if (error.code === 'auth/wrong-password') {
+        throw new Error('Contraseña incorrecta');
+      } else if (error.code === 'auth/too-many-requests') {
+        throw new Error('Demasiados intentos fallidos. Intente más tarde');
+      } else if (error.code === 'auth/network-request-failed') {
+        throw new Error('Error de conexión. Verifique su conexión a internet');
+      }
+      
+      throw new Error('Error al iniciar sesión');
     }
   },
 

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { enableIndexedDbPersistence } from 'firebase/firestore';
 
@@ -12,17 +12,28 @@ const firebaseConfig = {
   appId: "1:573102466051:web:fdf5638ab9d052f5919a36"
 };
 
+console.log('Inicializando Firebase...');
+
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
+console.log('Firebase App inicializado');
 
 // Inicializar Auth
 export const auth = getAuth(app);
+console.log('Firebase Auth inicializado');
 
-// Inicializar Firestore con configuración específica
+// Inicializar Firestore
 export const db = getFirestore(app);
+console.log('Firebase Firestore inicializado');
+
+// Verificar conexión
+auth.onAuthStateChanged((user) => {
+  console.log('Estado de autenticación:', user ? 'Usuario autenticado' : 'No hay usuario');
+});
 
 // Configuración para desarrollo
 if (process.env.NODE_ENV === 'development') {
+  console.log('Modo desarrollo activado');
   // Habilitar persistencia offline
   enableIndexedDbPersistence(db).catch((err) => {
     if (err.code === 'failed-precondition') {
